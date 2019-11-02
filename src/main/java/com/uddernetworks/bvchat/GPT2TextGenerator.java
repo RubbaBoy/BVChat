@@ -9,14 +9,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-public class PromptedTextGenerator {
+public class GPT2TextGenerator {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(PromptedTextGenerator.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(GPT2TextGenerator.class);
 
     private final BVChat bvChat;
     private File gpt2Directory;
 
-    public PromptedTextGenerator(BVChat bvChat, File gpt2Directory) {
+    public GPT2TextGenerator(BVChat bvChat, File gpt2Directory) {
         this.bvChat = bvChat;
         this.gpt2Directory = gpt2Directory;
     }
@@ -35,6 +35,23 @@ public class PromptedTextGenerator {
             }
 
             bvChat.getWebhookManager().sendFromNNBatch(input, String.join("\n", inputLines));
+        });
+    }
+
+    public CompletableFuture<Void> generateUnprompted() {
+        return CompletableFuture.runAsync(() -> {
+            boolean readingLines = false;
+            var inputLines = new ArrayList<String>();
+            for (String line : Commandline.runCommand(List.of("python", "src/generate_unconditional_samples.py", "--temperature", "0.8", "--top_k", "40", "--model_name", "ready", "--nsamples", "1"), gpt2Directory)
+                    .split("\\r?\\n")) {
+                if (line.startsWith("====================")) {
+                    readingLines = true;
+                } else if (readingLines) {
+                    inputLines.add(line);
+                }
+            }
+
+            bvChat.getWebhookManager().sendFromNNBatch("==== Unprompted ====", String.join("\n", inputLines));
         });
     }
 }

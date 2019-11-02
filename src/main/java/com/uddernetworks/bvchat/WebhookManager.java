@@ -3,6 +3,7 @@ package com.uddernetworks.bvchat;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.MessageBuilder;
+import net.dv8tion.jda.api.entities.Emote;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.TextChannel;
 import net.dv8tion.jda.api.entities.User;
@@ -34,12 +35,14 @@ public class WebhookManager {
 
     private TextChannel channel;
     private List<Webhook> webhooks;
+    private List<Emote> emotes;
 
     public WebhookManager(BVChat bvChat) {
         this.bvChat = bvChat;
         this.jda = bvChat.getJda();
         this.channel = jda.getTextChannelById(bvChat.getConfigManager().getConfig().getLong("channel"));
         this.webhooks = channel.retrieveWebhooks().complete();
+        this.emotes = channel.getGuild().getEmotes();
     }
 
     public void sendPromptNotice(String prompt) {
@@ -103,7 +106,7 @@ public class WebhookManager {
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(
                         "{\n" +
-                                "  \"content\": \"" + message + "\",\n" +
+                                "  \"content\": \"" + processDiscordEmotes(message) + "\",\n" +
                                 "  \"username\": \"" + username + "\"" +
                                     customAvatar +
                                 "}"
@@ -120,5 +123,11 @@ public class WebhookManager {
             waitMessage.delete().queue();
             sendMessage(user, message);
         }
+    }
+
+    private String processDiscordEmotes(String message) {
+        final String[] newMessage = {message};
+        emotes.forEach(e -> newMessage[0] = newMessage[0].replace(":" + e.getName() + ":", e.getAsMention()));
+        return newMessage[0];
     }
 }

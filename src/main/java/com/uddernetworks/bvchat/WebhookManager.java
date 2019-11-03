@@ -2,9 +2,7 @@ package com.uddernetworks.bvchat;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.JDA;
-import net.dv8tion.jda.api.MessageBuilder;
 import net.dv8tion.jda.api.entities.Emote;
-import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.TextChannel;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.Webhook;
@@ -17,10 +15,13 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class WebhookManager {
@@ -37,10 +38,10 @@ public class WebhookManager {
     private List<Webhook> webhooks;
     private List<Emote> emotes;
 
-    public WebhookManager(BVChat bvChat) {
+    public WebhookManager(BVChat bvChat, TextChannel textChannel) {
         this.bvChat = bvChat;
         this.jda = bvChat.getJda();
-        this.channel = jda.getTextChannelById(bvChat.getConfigManager().getConfig().getLong("channel"));
+        this.channel = textChannel;
         this.webhooks = channel.retrieveWebhooks().complete();
         this.emotes = channel.getGuild().getEmotes();
     }
@@ -63,27 +64,44 @@ public class WebhookManager {
                 .complete();
     }
 
-    public void sendFromNNBatch(String prompt, String input) {
-        if (prompt != null) sendPromptNotice(prompt);
-        Arrays.stream(input.split("\n")).forEach(line -> {
-            var userMessage = line.split(" > ", 2);
-            if (userMessage.length != 2) return;
-            var message = userMessage[1].trim();
-
-            double length = message.split("\\s+").length;
-            Thread.sleep((long) Math.min(random(0, 2000) + length * 100, 4000));
-
+    public CompletableFuture<Void> sendFromNNBatch(String prompt, Path path) {
+        return CompletableFuture.supplyAsync(() -> {
             try {
-                sendMessage(userMessage[0].trim(), message);
-            } catch (IOException | InterruptedException e) {
-                LOGGER.error("Error sending message from {}", userMessage[0].trim());
+                return Files.readString(path);
+            } catch (IOException e) {
+                LOGGER.error("Error reading file " + path, e);
+                return "";
             }
-        });
-        if (prompt != null) sendPromptEndNotice(prompt);
+        }).thenAccept(input -> sendFromNNBatch(prompt, input).join());
     }
 
-    private double random(int origin, int bound) {
-        return ThreadLocalRandom.current().nextDouble(origin, bound);
+    public CompletableFuture<Void> sendFromNNBatch(String prompt, String input) {
+        return CompletableFuture.runAsync(() -> {
+            if (prompt != null) sendPromptNotice(prompt);
+            Arrays.stream(input.split("\n")).forEach(line -> {
+                var userMessage = line.split(" > ", 2);
+                if (userMessage.length != 2) return;
+                var message = userMessage[1].trim();
+
+                try {
+                    sendMessage(userMessage[0].trim(), message);
+                } catch (IOException | InterruptedException e) {
+                    LOGGER.error("Error sending message from {}", userMessage[0].trim());
+                }
+
+                double length = message.split("\\s+").length;
+                if (length <= 3) {
+                    Thread.sleep(random(1000, 2000));
+                } else {
+                    Thread.sleep((long) Math.min(random(500, 2500) + (length * 100), 5000));
+                }
+            });
+            if (prompt != null) sendPromptEndNotice(prompt);
+        });
+    }
+
+    private long random(int origin, int bound) {
+        return ThreadLocalRandom.current().nextLong(origin, bound);
     }
 
     public void sendMessage(String user, String message) throws IOException, InterruptedException {

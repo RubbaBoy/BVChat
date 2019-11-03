@@ -34,7 +34,8 @@ public class GPT2TextGenerator {
                 }
             }
 
-            bvChat.getWebhookManager().sendFromNNBatch(input, String.join("\n", inputLines));
+            bvChat.stopTyping();
+            bvChat.getWebhookManager().sendFromNNBatch(input, String.join("\n", inputLines)).join();
         });
     }
 
@@ -51,7 +52,8 @@ public class GPT2TextGenerator {
                 }
             }
 
-            bvChat.getWebhookManager().sendFromNNBatch("==== Unprompted ====", String.join("\n", inputLines));
+            bvChat.stopTyping();
+            bvChat.getWebhookManager().sendFromNNBatch("==== Unprompted ====", String.join("\n", inputLines)).join();
         });
     }
 }

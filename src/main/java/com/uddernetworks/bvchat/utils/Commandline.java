@@ -27,7 +27,7 @@ public class Commandline {
         }
 
         var result = new StringBuilder();
-        runInheritedCommand(command, directory, false, process -> {
+        runInheritedCommand(command, directory, true, process -> {
             inheritIOToStringBuilder(process.getInputStream(), result);
             inheritIOToStringBuilder(process.getErrorStream(), result);
         });

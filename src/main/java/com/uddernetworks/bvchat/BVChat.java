@@ -15,9 +15,9 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nonnull;
 import javax.security.auth.login.LoginException;
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 public class BVChat extends ListenerAdapter {
 
@@ -31,6 +31,7 @@ public class BVChat extends ListenerAdapter {
     private boolean processing = false;
     private long ownerId;
     private boolean active = true;
+    private TextChannel textChannel;
 
     public static void main(String[] args) throws LoginException {
         new BVChat().main();
@@ -45,6 +46,12 @@ public class BVChat extends ListenerAdapter {
                 .setActivity(Activity.watching("kids"))
                 .addEventListeners(this)
                 .build();
+
+        new ScheduledThreadPoolExecutor(1).scheduleAtFixedRate(() -> {
+            if (typing) {
+                textChannel.sendTyping().complete();
+            }
+        }, 1, 5, TimeUnit.SECONDS);
     }
 
     @Override
@@ -53,7 +60,8 @@ public class BVChat extends ListenerAdapter {
 
         java.lang.Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> LOGGER.error("Error on thread {}", thread.getName(), exception));
 
-        webhookManager = new WebhookManager(this);
+        textChannel = jda.getTextChannelById(configManager.getConfig().getLong("channel"));
+        webhookManager = new WebhookManager(this, textChannel);
         GPT2TextGenerator = new GPT2TextGenerator(this, new File("E:\\gpt-2"));
 
         ownerId = configManager.getConfig().getLong("owner");
@@ -95,32 +103,33 @@ public class BVChat extends ListenerAdapter {
                 return;
             }
 
+            processing = true;
+            startTyping();
+
             if (contents.startsWith("file ")) {
                 var file = contents.substring("file ".length());
                 if (!file.endsWith(".txt")) {
                     sendMessage(message, "File must be a text file!");
+                    processing = false;
+                    stopTyping();
                     return;
                 }
 
-                processing = true;
-                try {
-                    webhookManager.sendFromNNBatch("==== File " + file + " ====", Files.readString(Paths.get("E:\\BVChat\\" + file)));
-                } catch (IOException e) {
-                    LOGGER.error("Error reading " + file, e);
-                    sendMessage(message, "Fuck, an error.");
-                }
-                processing = false;
-
+                webhookManager.sendFromNNBatch("==== File " + file + " ====", Paths.get("E:\\BVChat\\" + file))
+                        .thenRun(() -> processing = false)
+                        .exceptionally(e -> {
+                            LOGGER.error("Error while sending conversation while reading file " + file, e);
+                            sendMessage(message, "Fuck, an error.");
+                            return null;
+                        });
                 return;
             } else if (contents.equals("") || contents.equalsIgnoreCase("unprompted")) {
-                processing = true;
-                sendMessage(message, "Got it");
+                sendMessage(message, "Aight, unprompted it is");
                 GPT2TextGenerator.generateUnprompted().thenRun(() -> processing = false);
                 return;
             }
 
-            processing = true;
-            sendMessage(message, "Got it");
+            sendMessage(message, "Aight");
             GPT2TextGenerator.generateFor(contents).thenRun(() -> processing = false);
         }
     }
@@ -131,6 +140,16 @@ public class BVChat extends ListenerAdapter {
 
     private void sendMessage(TextChannel textChannel, String message) {
         textChannel.sendMessage(message).queue();
+    }
+
+    private boolean typing;
+
+    public void startTyping() {
+        typing = true;
+    }
+
+    public void stopTyping() {
+        typing = false;
     }
 
     public JDAImpl getJda() {

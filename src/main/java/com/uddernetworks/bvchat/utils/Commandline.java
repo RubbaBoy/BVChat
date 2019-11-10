@@ -78,7 +78,7 @@ public class Commandline {
     private static void inheritIO(InputStream inputStream, String threadName) {
         CompletableFuture.runAsync(() -> {
             Thread.currentThread().setName(threadName);
-            Scanner sc = new Scanner(inputStream);
+            var sc = new Scanner(inputStream);
             while (sc.hasNextLine()) {
                 LOGGER.info(sc.nextLine());
             }
@@ -87,7 +87,7 @@ public class Commandline {
 
     private static void inheritIOToStringBuilder(InputStream inputStream, StringBuilder stringBuilder) {
         CompletableFuture.runAsync(() -> {
-            Scanner sc = new Scanner(inputStream);
+            var sc = new Scanner(inputStream);
             while (sc.hasNextLine()) {
                 var line = sc.nextLine();
                 synchronized (stringBuilder) {

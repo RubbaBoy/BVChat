@@ -37,6 +37,7 @@ public class WebhookManager {
     private TextChannel channel;
     private List<Webhook> webhooks;
     private List<Emote> emotes;
+    private final HttpClient httpClient = HttpClient.newHttpClient();
 
     public WebhookManager(BVChat bvChat, TextChannel textChannel) {
         this.bvChat = bvChat;
@@ -71,6 +72,8 @@ public class WebhookManager {
             } catch (IOException e) {
                 LOGGER.error("Error reading file " + path, e);
                 return "";
+            } finally {
+                bvChat.stopTyping();
             }
         }).thenAccept(input -> sendFromNNBatch(prompt, input).join());
     }
@@ -109,8 +112,6 @@ public class WebhookManager {
 
         var webhook = webhooks.get(0);
 
-        HttpClient client = HttpClient.newHttpClient();
-
         var customAvatar = "";
         var username = nameWithoutNumber;
         var userDude = userAvatars.computeIfAbsent(user, $ -> jda.getUserByTag(user));
@@ -131,15 +132,17 @@ public class WebhookManager {
                 ))
                 .build();
 
-        var result = client.send(request, HttpResponse.BodyHandlers.ofString());
-        var body = result.body();
-        if (body.contains("You are being rate limited.")) {
-            int wait = Integer.parseInt(body.split("\"retry_after\": ")[1].replace("}", "").trim()) + 100;
-            LOGGER.info("Waiting {}ms", wait);
-            var waitMessage = channel.sendMessage("Waiting " + wait + "ms").complete();
-            Thread.sleep(wait);
-            waitMessage.delete().queue();
-            sendMessage(user, message);
+        synchronized (httpClient) {
+            var result = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            var body = result.body();
+            if (body.contains("You are being rate limited.")) {
+                int wait = Integer.parseInt(body.split("\"retry_after\": ")[1].replace("}", "").trim()) + 100;
+                LOGGER.info("Waiting {}ms", wait);
+                var waitMessage = channel.sendMessage("Waiting " + wait + "ms").complete();
+                Thread.sleep(wait);
+                waitMessage.delete().queue();
+                sendMessage(user, message);
+            }
         }
     }
 

@@ -27,11 +27,13 @@ public class BVChat extends ListenerAdapter {
     private JDAImpl jda;
 
     private WebhookManager webhookManager;
-    private GPT2TextGenerator GPT2TextGenerator;
-    private boolean processing = false;
+    private GPT2TextGenerator gpt2TextGenerator;
     private long ownerId;
-    private boolean active = true;
     private TextChannel textChannel;
+
+    private boolean active = true;
+    private boolean processing;
+    private boolean typing;
 
     public static void main(String[] args) throws LoginException {
         new BVChat().main();
@@ -62,7 +64,7 @@ public class BVChat extends ListenerAdapter {
 
         textChannel = jda.getTextChannelById(configManager.getConfig().getLong("channel"));
         webhookManager = new WebhookManager(this, textChannel);
-        GPT2TextGenerator = new GPT2TextGenerator(this, new File("E:\\gpt-2"));
+        gpt2TextGenerator = new GPT2TextGenerator(this, new File("E:\\gpt-2"));
 
         ownerId = configManager.getConfig().getLong("owner");
     }
@@ -125,12 +127,12 @@ public class BVChat extends ListenerAdapter {
                 return;
             } else if (contents.equals("") || contents.equalsIgnoreCase("unprompted")) {
                 sendMessage(message, "Aight, unprompted it is");
-                GPT2TextGenerator.generateUnprompted().thenRun(() -> processing = false);
+                gpt2TextGenerator.generateUnprompted().thenRun(() -> processing = false);
                 return;
             }
 
             sendMessage(message, "Aight");
-            GPT2TextGenerator.generateFor(contents).thenRun(() -> processing = false);
+            gpt2TextGenerator.generateFor(contents).thenRun(() -> processing = false);
         }
     }
 
@@ -141,8 +143,6 @@ public class BVChat extends ListenerAdapter {
     private void sendMessage(TextChannel textChannel, String message) {
         textChannel.sendMessage(message).queue();
     }
-
-    private boolean typing;
 
     public void startTyping() {
         typing = true;

@@ -110,7 +110,7 @@ public class BVChat extends ListenerAdapter {
 
             if (contents.startsWith("file ")) {
                 var file = contents.substring("file ".length());
-                if (!file.endsWith(".txt")) {
+                if (!file.endsWith(".txt") || file.contains(":")) {
                     sendMessage(message, "File must be a text file!");
                     processing = false;
                     stopTyping();

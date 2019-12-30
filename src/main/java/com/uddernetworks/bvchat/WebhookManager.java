@@ -88,8 +88,9 @@ public class WebhookManager {
 
                 try {
                     sendMessage(userMessage[0].trim(), message);
-                } catch (IOException | InterruptedException e) {
-                    LOGGER.error("Error sending message from {}", userMessage[0].trim());
+                } catch (Exception e) {
+                    LOGGER.error("Bad input: {}", line);
+                    LOGGER.error("Error sending message from " + userMessage[0].trim(), e);
                 }
 
                 double length = message.split("\\s+").length;
@@ -107,14 +108,19 @@ public class WebhookManager {
         return ThreadLocalRandom.current().nextLong(origin, bound);
     }
 
-    public void sendMessage(String user, String message) throws IOException, InterruptedException {
-        var nameWithoutNumber = user.substring(0, user.lastIndexOf('#'));
+    public void sendMessage(String user, String message) throws Exception {
+        var nameWithoutNumber = user.substring(0, Math.max(0, user.lastIndexOf('#')));
+        if (nameWithoutNumber.isBlank()) {
+            user = "Unknown" + user;
+            nameWithoutNumber = "Unknown";
+        }
 
         var webhook = webhooks.get(0);
 
         var customAvatar = "";
         var username = nameWithoutNumber;
-        var userDude = userAvatars.computeIfAbsent(user, $ -> jda.getUserByTag(user));
+        String finalUser = user;
+        var userDude = userAvatars.computeIfAbsent(user, $ -> jda.getUserByTag(finalUser));
         if (userDude != null) {
             customAvatar = ",\n\"avatar_url\": \"" + userDude.getAvatarUrl() + "\"";
             username = userDude.getName();

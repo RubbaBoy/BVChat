@@ -25,7 +25,7 @@ public class GPT2TextGenerator {
         return CompletableFuture.runAsync(() -> {
             boolean readingLines = false;
             var inputLines = new ArrayList<String>();
-            for (String line : Commandline.runCommand(List.of("python", "src/interactive_conditional_samples.py", "--temperature", "0.8", "--top_k", "40", "--model_name", "ready", "--prompt", input), gpt2Directory)
+            for (String line : Commandline.runCommand(List.of("python", "src/interactive_conditional_samples.py", "--temperature", "0.8", "--top_p", "0.9", "--model_name", "ready", "--prompt", input), gpt2Directory)
                     .split("\\r?\\n")) {
                 if (line.startsWith("====================")) {
                     readingLines = true;
@@ -33,6 +33,8 @@ public class GPT2TextGenerator {
                     inputLines.add(line);
                 }
             }
+
+            System.out.println("inputLines = " + String.join("\n", inputLines));
 
             bvChat.stopTyping();
             bvChat.getWebhookManager().sendFromNNBatch(input, String.join("\n", inputLines)).join();
@@ -43,7 +45,7 @@ public class GPT2TextGenerator {
         return CompletableFuture.runAsync(() -> {
             boolean readingLines = false;
             var inputLines = new ArrayList<String>();
-            for (String line : Commandline.runCommand(List.of("python", "src/generate_unconditional_samples.py", "--temperature", "0.8", "--top_k", "40", "--model_name", "ready", "--nsamples", "1"), gpt2Directory)
+            for (String line : Commandline.runCommand(List.of("python", "src/generate_unconditional_samples.py", "--temperature", "0.8", "--top_k", "0", "--model_name", "ready", "--nsamples", "1"), gpt2Directory)
                     .split("\\r?\\n")) {
                 if (line.startsWith("====================")) {
                     readingLines = true;
@@ -51,6 +53,8 @@ public class GPT2TextGenerator {
                     inputLines.add(line);
                 }
             }
+
+            System.out.println("inputLines = " + String.join("\n", inputLines));
 
             bvChat.stopTyping();
             bvChat.getWebhookManager().sendFromNNBatch("==== Unprompted ====", String.join("\n", inputLines)).join();
